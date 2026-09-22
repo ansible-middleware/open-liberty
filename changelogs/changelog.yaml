@@ -1,3 +1,22 @@
----
 ancestor: null
-releases: {}
+releases:
+  1.0.0:
+    changes:
+      major_changes:
+      - 'Initial roles for install, upgrade and deploy apps with IBM Open Liberty
+        `#1 <https://github.com/ansible-middleware/open-liberty/pull/1>`_
+
+        '
+      - 'Setup docs, .github files, changelog and docs. Fixed issues with Sanity and
+        molecule tests. `#3 <https://github.com/ansible-middleware/open-liberty/pull/3>`_
+
+        '
+      minor_changes:
+      - 'Fix version in galaxy.yml and release pipeline `#4 <https://github.com/ansible-middleware/open-liberty/pull/4>`_
+
+        '
+    fragments:
+    - 1.yaml
+    - 3.yaml
+    - 4.yaml
+    release_date: '2026-09-22'
