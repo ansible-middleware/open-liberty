@@ -1,0 +1,17 @@
+---
+_openliberty_server_dir: "{{ openliberty_home }}/usr/servers/{{ openliberty_server_name }}"
+_openliberty_overrides_dir: "{{ _openliberty_server_dir }}/configDropins/overrides"
+
+# Accepts {aes}..., {hash}... or ${variable} references only.
+_openliberty_encoded_password_regex: '^([{]aes[}]|[{]hash[}]|[$][{])'
+
+_openliberty_security_registry_types:
+  - basic
+  - ldap
+  - none
+
+_openliberty_security_same_site_values:
+  - Lax
+  - Strict
+  - None
+  - Disabled

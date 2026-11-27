@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Managed by Ansible (admin_center_config role) – do not edit by hand -->
+<!-- Reference: https://openliberty.io/docs/latest/admin-center.html -->
+<server>
+
+    <featureManager>
+        <feature>{{ openliberty_admin_center_feature }}</feature>
+{% for f in openliberty_admin_center_extra_features %}
+        <feature>{{ f }}</feature>
+{% endfor %}
+    </featureManager>
+
+    <administrator-role>
+{% for u in openliberty_admin_center_administrator_users %}
+        <user>{{ u | e }}</user>
+{% endfor %}
+{% for g in openliberty_admin_center_administrator_groups %}
+        <group>{{ g | e }}</group>
+{% endfor %}
+    </administrator-role>
+{% if openliberty_admin_center_reader_users | length > 0 or openliberty_admin_center_reader_groups | length > 0 %}
+
+    <reader-role>
+{% for u in openliberty_admin_center_reader_users %}
+        <user>{{ u | e }}</user>
+{% endfor %}
+{% for g in openliberty_admin_center_reader_groups %}
+        <group>{{ g | e }}</group>
+{% endfor %}
+    </reader-role>
+{% endif %}
+{% if openliberty_admin_center_read_dirs | length > 0 or openliberty_admin_center_write_dirs | length > 0 %}
+
+    <remoteFileAccess>
+{% for d in openliberty_admin_center_read_dirs %}
+        <readDir>{{ d | e }}</readDir>
+{% endfor %}
+{% for d in openliberty_admin_center_write_dirs %}
+        <writeDir>{{ d | e }}</writeDir>
+{% endfor %}
+    </remoteFileAccess>
+{% endif %}
+
+</server>

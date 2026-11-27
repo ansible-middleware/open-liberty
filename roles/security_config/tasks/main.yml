@@ -1,0 +1,86 @@
+---
+# security_config – main task entry point
+# Writes configDropins/overrides/security_config.xml.
+# Reference: https://openliberty.io/docs/latest/security-overview.html
+
+- name: Validate security configuration inputs
+  ansible.builtin.assert:
+    that:
+      - openliberty_security_registry_type in _openliberty_security_registry_types
+      - openliberty_security_session_cookie_same_site in _openliberty_security_same_site_values
+      - openliberty_security_registry_type != 'basic' or openliberty_security_users | length > 0
+      - openliberty_security_registry_type != 'ldap'
+        or (openliberty_security_ldap_host | length > 0
+        and openliberty_security_ldap_base_dn | length > 0)
+      - openliberty_security_session_cookie_same_site != 'None'
+        or (openliberty_security_session_cookie_secure | bool)
+    fail_msg: >-
+      registry type must be one of {{ _openliberty_security_registry_types | join(', ') }};
+      basic registry needs at least one user; ldap registry needs host and base DN;
+      cookie SameSite must be one of {{ _openliberty_security_same_site_values | join(', ') }};
+      SameSite=None requires openliberty_security_session_cookie_secure: true.
+    quiet: true
+
+- name: Validate registry passwords are encoded
+  ansible.builtin.assert:
+    that:
+      - openliberty_security_users
+        | selectattr('password', 'defined')
+        | list | length == openliberty_security_users | length
+      - openliberty_security_users
+        | rejectattr('password', 'match', _openliberty_encoded_password_regex)
+        | list | length == 0
+      - openliberty_security_registry_type != 'ldap'
+        or openliberty_security_ldap_bind_password == ''
+        or openliberty_security_ldap_bind_password is match(_openliberty_encoded_password_regex)
+      - openliberty_security_ltpa_keys_password == ''
+        or openliberty_security_ltpa_keys_password is match(_openliberty_encoded_password_regex)
+    fail_msg: >-
+      Passwords must be {aes}/{hash} encoded (securityUtility encode) or ${variable}
+      references. Set openliberty_security_require_encoded_passwords: false to
+      override (not recommended).
+    quiet: true
+  when: openliberty_security_require_encoded_passwords | bool
+
+- name: Build security feature install list
+  ansible.builtin.set_fact:
+    _openliberty_security_features_to_install: >-
+      {{
+        [openliberty_security_feature]
+        + ([openliberty_security_ldap_feature]
+           if openliberty_security_registry_type == 'ldap' else [])
+      }}
+  when: openliberty_security_install_features | bool
+
+- name: Ensure security features are installed
+  ansible.builtin.command:
+    cmd: >-
+      {{ openliberty_home }}/bin/featureUtility installFeature
+      {{ _openliberty_security_features_to_install | join(' ') }}
+      --acceptLicense
+  become: true
+  become_user: "{{ openliberty_user }}"
+  register: _openliberty_security_feature_install
+  changed_when: "'CWWKF1700I' in _openliberty_security_feature_install.stdout"
+  when: openliberty_security_install_features | bool
+
+- name: Ensure configDropins/overrides directory exists
+  ansible.builtin.file:
+    path: "{{ _openliberty_overrides_dir }}"
+    state: directory
+    owner: "{{ openliberty_user }}"
+    group: "{{ openliberty_group }}"
+    mode: "0750"
+  become: true
+
+- name: Deploy security configuration override
+  ansible.builtin.template:
+    src: security_config.xml.j2
+    dest: "{{ _openliberty_overrides_dir }}/security_config.xml"
+    owner: "{{ openliberty_user }}"
+    group: "{{ openliberty_group }}"
+    mode: "0640"
+    backup: true
+  become: true
+  no_log: true
+  notify: Restart Open Liberty service

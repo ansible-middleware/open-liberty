@@ -3,6 +3,8 @@ driver:
   name: docker
 
 platforms:
+  # Probes use 127.0.0.1 inside the container; do not publish host ports.
+  # Parallel CI molecule jobs collide when multiple scenarios bind the same host port.
   - name: instance-rhel10
     image: registry.access.redhat.com/ubi10/ubi-init:latest
     command: "/usr/sbin/init"
@@ -10,8 +12,6 @@ platforms:
     privileged: true
     exposed_ports:
       - "9080/tcp"
-    published_ports:
-      - 0.0.0.0:${PORT_BINDING:-9080}:9080/TCP
 
   - name: instance-rhel9
     image: registry.access.redhat.com/ubi9/ubi-init:latest

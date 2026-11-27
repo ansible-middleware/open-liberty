@@ -1,0 +1,15 @@
+---
+_openliberty_server_dir: "{{ openliberty_home }}/usr/servers/{{ openliberty_server_name }}"
+_openliberty_overrides_dir: "{{ _openliberty_server_dir }}/configDropins/overrides"
+_openliberty_jdbc_dir: "{{ _openliberty_server_dir }}/{{ openliberty_jdbc_driver_dir }}"
+
+# Accepts {aes}..., {hash} or ${variable} references only.
+_openliberty_encoded_password_regex: '^([{]aes[}]|[{]hash[}]|[$][{])'
+
+# Skip deploy when the playbook includes this role without any JDBC inputs.
+_openliberty_datasource_configured: >-
+  {{
+    (openliberty_jdbc_drivers | length > 0)
+    or (openliberty_datasource_auth | length > 0)
+    or (openliberty_datasources_config | length > 0)
+  }}

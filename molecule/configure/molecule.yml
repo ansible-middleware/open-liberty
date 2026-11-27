@@ -1,0 +1,56 @@
+---
+# TLS, security registry, HTTPS, Admin Center and empty JDBC no-op on RHEL 9.
+
+provisioner:
+  name: ansible
+  env:
+    ANSIBLE_FORCE_COLOR: "true"
+  playbooks:
+    prepare: ../prepare.yml
+    converge: converge.yml
+    verify: verify.yml
+    cleanup: ../default/cleanup.yml
+  inventory:
+    group_vars:
+      all:
+        openliberty_version: "24.0.0.9"
+        openliberty_edition: webProfile
+        openliberty_server_name: defaultServer
+        openliberty_http_port: 9080
+        openliberty_https_port: 9443
+        openliberty_https_enabled: true
+        openliberty_install_java: true
+        openliberty_validate_health_endpoint: false
+        # Molecule uses a disposable keystore; encoding is exercised in docs, not here.
+        openliberty_ssl_require_encoded_passwords: false
+        openliberty_security_require_encoded_passwords: false
+        openliberty_ssl_keystore_password: "changeit"
+        openliberty_security_users:
+          - name: admin
+            password: "adminpwd"
+        openliberty_admin_center_administrator_users:
+          - admin
+
+platforms:
+  - name: instance-rhel9
+    image: registry.access.redhat.com/ubi9/ubi-init:latest
+    command: "/usr/sbin/init"
+    pre_build_image: true
+    privileged: true
+    exposed_ports:
+      - "9080/tcp"
+      - "9443/tcp"
+
+verifier:
+  name: ansible
+
+scenario:
+  test_sequence:
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - verify
+    - cleanup
+    - destroy

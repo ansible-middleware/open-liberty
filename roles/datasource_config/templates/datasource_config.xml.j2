@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Managed by Ansible (datasource_config role) – do not edit by hand -->
+<!-- Reference: https://openliberty.io/docs/latest/relational-database-connections-JDBC.html -->
+<server>
+
+    <featureManager>
+        <feature>{{ openliberty_datasource_feature }}</feature>
+    </featureManager>
+{% for d in openliberty_jdbc_drivers %}
+
+    <library id="{{ d.id }}Lib">
+{% for jar in d.jars %}
+        <file name="${server.config.dir}/{{ openliberty_jdbc_driver_dir }}/{{ jar }}" />
+{% endfor %}
+    </library>
+
+    <jdbcDriver id="{{ d.id }}" libraryRef="{{ d.id }}Lib"
+{% if d.data_source is defined %}
+                javax.sql.DataSource="{{ d.data_source | e }}"
+{% endif %}
+{% if d.connection_pool_data_source is defined %}
+                javax.sql.ConnectionPoolDataSource="{{ d.connection_pool_data_source | e }}"
+{% elif d.class is defined %}
+                javax.sql.ConnectionPoolDataSource="{{ d.class | e }}"
+{% endif %}
+{% if d.xa_data_source is defined %}
+                javax.sql.XADataSource="{{ d.xa_data_source | e }}"
+{% endif %}
+    />
+
+{% endfor %}
+{% for a in openliberty_datasource_auth %}
+
+    <authData id="{{ a.id }}" user="{{ a.user | e }}" password="{{ a.password | e }}" />
+{% endfor %}
+{% for ds in openliberty_datasources_config %}
+
+    <dataSource id="{{ ds.id }}"
+                jndiName="{{ ds.jndiName }}"
+                jdbcDriverRef="{{ ds.driver }}"
+{% if ds.auth is defined and ds.auth | length > 0 %}
+                containerAuthDataRef="{{ ds.auth }}"
+{% endif %}
+{% if ds.type is defined %}
+                type="{{ ds.type }}"
+{% endif %}
+{% if ds.isolationLevel is defined %}
+                isolationLevel="{{ ds.isolationLevel }}"
+{% endif %}
+{% if ds.statementCacheSize is defined %}
+                statementCacheSize="{{ ds.statementCacheSize }}"
+{% endif %}
+    >
+{% set _pe = ds.properties_element | default('properties') %}
+        <{{ _pe }}
+{% for k, v in (ds.properties | default({})).items() %}
+            {{ k }}="{{ v | e }}"
+{% endfor %}
+        />
+{% if ds.pool is defined and ds.pool | length > 0 %}
+        <connectionManager
+{% for k, v in ds.pool.items() %}
+            {{ k }}="{{ v | e }}"
+{% endfor %}
+        />
+{% endif %}
+    </dataSource>
+{% endfor %}
+
+</server>

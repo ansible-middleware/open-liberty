@@ -45,6 +45,10 @@ Create an Open Liberty server instance and render its configuration files
 
 ### Data sources
 
+Prefer [`datasource_config`](../datasource_config/README.md) for production JDBC
+setup (drivers, `authData`, pools, encoded passwords in `configDropins`). The
+variable below remains for minimal inline examples only.
+
 | Variable | Description | Default |
 |:---------|:------------|:--------|
 | `openliberty_datasources` | List of `<dataSource>` stanzas rendered into `server.xml`. Each item: `id`, `jdbcDriverRef`, `databaseName` (or `url`), `user`, `password` | `[]` |

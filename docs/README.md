@@ -13,6 +13,10 @@ An Ansible collection to install, configure, and manage [IBM Open Liberty](https
 - **Deploy WAR / EAR / JAR applications** via dropins or explicit `server.xml` entries
 - **In-place version upgrades** with automatic backup and version-skip detection
 - **Reconfigure HTTP / HTTPS listener ports** and optionally update firewall rules
+- **Configure TLS** (keystore, truststore, protocol, ciphers, mutual TLS)
+- **Configure security** (basic or LDAP registry, secure cookies, LTPA)
+- **Configure JDBC data sources** (drivers, credentials, connection pools)
+- **Enable the Admin Center** with administrator/reader role mapping
 - Validate that the server started correctly and is accepting requests
 - Full uninstall workflow that cleanly removes all traces
 
@@ -47,6 +51,10 @@ Set `openliberty_edition` to one of the above values.
 | [`app_deploy`](roles/app_deploy/) | Deploy WAR/EAR/JAR applications (dropins or explicit entries) | [README](roles/app_deploy/README.md) |
 | [`version_update`](roles/version_update/) | In-place upgrade to a new Open Liberty version with backup | [README](roles/version_update/README.md) |
 | [`port_config`](roles/port_config/) | Reconfigure HTTP/HTTPS listener ports and firewall rules | [README](roles/port_config/README.md) |
+| [`ssl_config`](roles/ssl_config/) | Keystore, truststore, TLS protocol/ciphers, mutual TLS | [README](roles/ssl_config/README.md) |
+| [`security_config`](roles/security_config/) | Basic/LDAP registry, web app security, cookie hardening, LTPA | [README](roles/security_config/README.md) |
+| [`datasource_config`](roles/datasource_config/) | JDBC drivers, authData, data sources, connection pools | [README](roles/datasource_config/README.md) |
+| [`admin_center_config`](roles/admin_center_config/) | Admin Center feature, administrator/reader roles | [README](roles/admin_center_config/README.md) |
 | [`validation`](roles/validation/) | Health check: service status + port wait + optional `/health` endpoint | [README](roles/validation/README.md) |
 | [`uninstall`](roles/uninstall/) | Stop service, remove files, remove user/group | [README](roles/uninstall/README.md) |
 
@@ -159,6 +167,19 @@ All variables are documented in each role's `defaults/main.yml` and the role REA
 | `openliberty_firewall_port_manage` | Open ports in firewalld/ufw | `false` |
 | `openliberty_firewall_zone` | firewalld zone for port rules | `public` |
 
+### TLS, Security, Data Sources and Admin Center
+
+These roles write `configDropins/overrides/<role>.xml` and leave `server.xml` untouched.
+Passwords must be `{aes}`-encoded (`securityUtility encode`) or `${variable}` references;
+plaintext is rejected. See each role README for the full variable list.
+
+| Role | Key variables |
+|:-----|:--------------|
+| `ssl_config` | `openliberty_ssl_keystore_src`, `openliberty_ssl_keystore_password` (required), `openliberty_ssl_protocol` (`TLSv1.3,TLSv1.2`), `openliberty_ssl_enabled_ciphers`, `openliberty_ssl_client_authentication` |
+| `security_config` | `openliberty_security_registry_type` (`basic`/`ldap`), `openliberty_security_users`, `openliberty_security_ldap_*`, `openliberty_security_session_cookie_same_site` |
+| `datasource_config` | `openliberty_jdbc_drivers`, `openliberty_datasource_auth`, `openliberty_datasources_config` |
+| `admin_center_config` | `openliberty_admin_center_administrator_users`/`_groups` (required), `openliberty_admin_center_reader_users`/`_groups`, `openliberty_admin_center_extra_features` |
+
 ### Validation (`validation`)
 
 | Variable | Description | Default |
@@ -185,6 +206,7 @@ All variables are documented in each role's `defaults/main.yml` and the role REA
 | [`deploy_app.yml`](playbooks/deploy_app.yml) | Deploy WAR/EAR/JAR applications |
 | [`version_update.yml`](playbooks/version_update.yml) | In-place upgrade to a new version |
 | [`port_config.yml`](playbooks/port_config.yml) | Reconfigure HTTP/HTTPS listener ports |
+| [`configure_server.yml`](playbooks/configure_server.yml) | TLS, security registry, HTTPS, Admin Center and data sources in one run |
 | [`upgrade.yml`](playbooks/upgrade.yml) | Rolling upgrade (stop → install → reconfigure → restart) |
 | [`validate.yml`](playbooks/validate.yml) | Run the validation role against live hosts |
 | [`uninstall.yml`](playbooks/uninstall.yml) | Cleanly remove Open Liberty from hosts |
@@ -199,6 +221,7 @@ CI runs `default` and `microprofile`. The other scenarios are for local runs.
 | [`microprofile`](molecule/microprofile/) | yes | install, server_config, systemd, validation | MicroProfile; `/health` returns 200 |
 | [`app_deploy`](molecule/app_deploy/) | local | app_deploy | WAR via configDropins and dropins; backup; ownership |
 | [`port_config`](molecule/port_config/) | local | port_config | Port reconfiguration 9080→8080; old port closed |
+| [`configure`](molecule/configure/) | local | ssl, security, port, admin_center, datasource | TLS + basic registry + Admin Center + empty JDBC no-op |
 | [`version_update`](molecule/version_update/) | local | version_update | Upgrade 24.0.0.9→24.0.0.12; backup dir; downgrade refused |
 | [`validation`](molecule/validation/) | local | validation | Service check, port wait, `/health` |
 | [`uninstall`](molecule/uninstall/) | local | uninstall | Install dir, unit, user, group, and port removed |

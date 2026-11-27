@@ -1,0 +1,3 @@
+---
+_openliberty_server_dir: "{{ openliberty_home }}/usr/servers/{{ openliberty_server_name }}"
+_openliberty_overrides_dir: "{{ _openliberty_server_dir }}/configDropins/overrides"

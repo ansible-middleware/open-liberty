@@ -1,0 +1,78 @@
+---
+# Security configuration: user registry (basic or LDAP), management roles,
+# web application security, LTPA, and session cookie hardening.
+# https://openliberty.io/docs/latest/security-overview.html
+# https://openliberty.io/docs/latest/reference/config/basicRegistry.html
+# https://openliberty.io/docs/latest/reference/config/ldapRegistry.html
+# https://openliberty.io/docs/latest/reference/config/webAppSecurity.html
+
+openliberty_home: /opt/openliberty/wlp
+openliberty_server_name: defaultServer
+openliberty_user: liberty
+openliberty_group: liberty
+openliberty_service_name: "openliberty-{{ openliberty_server_name }}"
+
+# --- Features ---------------------------------------------------------------
+# appSecurity-5.0 = Jakarta EE 10, appSecurity-4.0 = Jakarta EE 9, appSecurity-3.0 = Java EE 8.
+openliberty_security_feature: appSecurity-5.0
+openliberty_security_ldap_feature: ldapRegistry-3.0
+# Install missing features with featureUtility (needed for kernel / lean runtimes).
+openliberty_security_install_features: true
+
+# --- User registry: "basic", "ldap" or "none" -------------------------------
+openliberty_security_registry_type: basic
+
+# Basic registry. Passwords MUST be {aes}/{hash} encoded (securityUtility encode)
+# or ${variable} references. Keep them in Ansible Vault.
+openliberty_security_registry_id: basic
+openliberty_security_realm: libertyRealm
+# - name: admin
+#   password: "{aes}..."
+openliberty_security_users: []
+# - name: admins
+#   members: [admin]
+openliberty_security_groups: []
+
+# LDAP registry (used when openliberty_security_registry_type == "ldap").
+openliberty_security_ldap_id: ldap
+openliberty_security_ldap_host: ""
+openliberty_security_ldap_port: 636
+openliberty_security_ldap_base_dn: ""
+openliberty_security_ldap_bind_dn: ""
+# Encoded value or ${variable} reference.
+openliberty_security_ldap_bind_password: ""
+# e.g. "Microsoft Active Directory", "IBM Tivoli Directory Server", "Custom"
+openliberty_security_ldap_type: Custom
+openliberty_security_ldap_realm: LdapRealm
+# TLS to the directory is on by default; sslRef is optional (defaults to the
+# server's default SSL config, see the ssl_config role).
+openliberty_security_ldap_ssl_enabled: true
+openliberty_security_ldap_ssl_ref: ""
+openliberty_security_ldap_search_timeout: 60s
+
+# --- Web application security ----------------------------------------------
+openliberty_security_http_only_cookies: true
+# SSO cookie only sent over HTTPS. Set false only when HTTPS is not enabled.
+openliberty_security_sso_requires_ssl: true
+openliberty_security_allow_failover_to_basic_auth: false
+openliberty_security_display_authentication_realm: false
+
+# --- HTTP session cookies ---------------------------------------------------
+openliberty_security_session_cookie_secure: true
+openliberty_security_session_cookie_http_only: true
+# Lax, Strict, None or Disabled
+openliberty_security_session_cookie_same_site: Lax
+
+# --- LTPA -------------------------------------------------------------------
+# Lifetime of LTPA tokens, e.g. 120m
+openliberty_security_ltpa_expiration: 120m
+# Optional: encoded password protecting a custom LTPA keys file.
+openliberty_security_ltpa_keys_password: ""
+
+# --- Hardening (server-configuration-hardening) -----------------------------
+# https://openliberty.io/docs/latest/server-configuration-hardening.html
+openliberty_security_remove_server_header: true
+openliberty_security_disable_x_powered_by: true
+
+# Refuse plaintext passwords in generated XML.
+openliberty_security_require_encoded_passwords: true

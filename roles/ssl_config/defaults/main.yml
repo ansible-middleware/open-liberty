@@ -1,0 +1,57 @@
+---
+# Configure TLS for Open Liberty: keystore, truststore, <ssl> and <sslDefault>.
+# https://openliberty.io/docs/latest/reference/config/keyStore.html
+# https://openliberty.io/docs/latest/reference/config/ssl.html
+# https://openliberty.io/docs/latest/reference/config/sslDefault.html
+
+openliberty_home: /opt/openliberty/wlp
+openliberty_server_name: defaultServer
+openliberty_user: liberty
+openliberty_group: liberty
+openliberty_service_name: "openliberty-{{ openliberty_server_name }}"
+
+# Feature that provides the SSL configuration elements.
+openliberty_ssl_feature: transportSecurity-1.0
+# Install missing features with featureUtility (needs outbound network once).
+openliberty_ssl_install_features: true
+
+# --- Keystore ---------------------------------------------------------------
+openliberty_ssl_keystore_id: defaultKeyStore
+# Path on the Ansible controller to an existing keystore. When empty, no file is
+# copied and the keystore at <server>/resources/security/<filename> is used as-is.
+# If that file does not exist, Open Liberty generates a self-signed certificate
+# at first start: acceptable for development only, never for production.
+openliberty_ssl_keystore_src: ""
+openliberty_ssl_keystore_filename: key.p12
+openliberty_ssl_keystore_type: PKCS12
+# REQUIRED. Must be an encoded value ({aes}..., {hash}...) or a ${variable}
+# reference. Generate with: <wlp>/bin/securityUtility encode --encoding=aes
+# Store the value in Ansible Vault.
+openliberty_ssl_keystore_password: ""
+
+# --- Truststore (optional) --------------------------------------------------
+openliberty_ssl_truststore_id: defaultTrustStore
+openliberty_ssl_truststore_src: ""
+openliberty_ssl_truststore_filename: trust.p12
+openliberty_ssl_truststore_type: PKCS12
+openliberty_ssl_truststore_password: ""
+
+# --- <ssl> element ----------------------------------------------------------
+# "defaultSSLConfig" is the id Open Liberty uses automatically for inbound TLS.
+openliberty_ssl_config_id: defaultSSLConfig
+# Single protocol (TLSv1.3 or TLSv1.2) or a comma-separated list.
+# Prefer "TLSv1.3,TLSv1.2" when clients may not speak TLS 1.3 yet.
+# A lone "TLSv1.3" enables TLS 1.3 only (not 1.2). Older protocols are refused.
+openliberty_ssl_protocol: "TLSv1.3,TLSv1.2"
+# JSSE cipher suite names (not OpenSSL names). Empty = Liberty/JDK defaults.
+# Example: [TLS_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384]
+openliberty_ssl_enabled_ciphers: []
+openliberty_ssl_verify_hostname: true
+# Mutual TLS: require / accept client certificates (requires a truststore password).
+openliberty_ssl_client_authentication: false
+openliberty_ssl_client_authentication_supported: false
+# Emit <sslDefault sslRef="..."/> so outbound connections use this config too.
+openliberty_ssl_set_default: true
+
+# Refuse plaintext passwords in generated XML.
+openliberty_ssl_require_encoded_passwords: true
