@@ -1,0 +1,117 @@
+---
+# verify.yml – configure scenario
+- name: Verify TLS, security, Admin Center and datasource no-op
+  hosts: all
+  gather_facts: false
+
+  vars:
+    _ol_server_dir: /opt/openliberty/wlp/usr/servers/defaultServer
+    _ol_overrides: "{{ _ol_server_dir }}/configDropins/overrides"
+
+  tasks:
+    - name: Stat configuration override files
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ _ol_overrides }}/ssl_config.xml"
+        - "{{ _ol_overrides }}/security_config.xml"
+        - "{{ _ol_overrides }}/port_config.xml"
+        - "{{ _ol_overrides }}/admin_center_config.xml"
+        - "{{ _ol_server_dir }}/resources/security/key.p12"
+      register: _ol_cfg_stats
+
+    - name: Assert required overrides and keystore exist
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Missing {{ item.item }}"
+        success_msg: "Present {{ item.item }}"
+      loop: "{{ _ol_cfg_stats.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Assert empty JDBC run did not create datasource_config.xml
+      ansible.builtin.stat:
+        path: "{{ _ol_overrides }}/datasource_config.xml"
+      register: _ol_ds_xml
+
+    - name: Confirm datasource_config.xml is absent for empty inputs
+      ansible.builtin.assert:
+        that: not _ol_ds_xml.stat.exists
+        fail_msg: "datasource_config.xml should not be written when JDBC inputs are empty"
+        success_msg: "datasource_config no-op confirmed"
+
+    - name: Slurp security_config.xml
+      ansible.builtin.slurp:
+        src: "{{ _ol_overrides }}/security_config.xml"
+      register: _ol_sec_xml
+      become: true
+
+    - name: Assert hardening and basic registry content
+      ansible.builtin.assert:
+        that:
+          - "'basicRegistry' in _sec"
+          - "'removeServerHeader=\"true\"' in _sec"
+          - "'disableXPoweredBy=\"true\"' in _sec"
+          - "'name=\"admin\"' in _sec"
+        fail_msg: "security_config.xml missing expected hardening/registry content"
+        success_msg: "security_config.xml content looks correct"
+      vars:
+        _sec: "{{ _ol_sec_xml.content | b64decode }}"
+
+    - name: Slurp admin_center_config.xml
+      ansible.builtin.slurp:
+        src: "{{ _ol_overrides }}/admin_center_config.xml"
+      register: _ol_ac_xml
+      become: true
+
+    - name: Assert Admin Center feature and administrator role
+      ansible.builtin.assert:
+        that:
+          - "'adminCenter-1.0' in _ac"
+          - "'<user>admin</user>' in _ac"
+        fail_msg: "admin_center_config.xml missing feature or administrator user"
+        success_msg: "admin_center_config.xml content looks correct"
+      vars:
+        _ac: "{{ _ol_ac_xml.content | b64decode }}"
+
+    - name: Slurp ssl_config.xml
+      ansible.builtin.slurp:
+        src: "{{ _ol_overrides }}/ssl_config.xml"
+      register: _ol_ssl_xml
+      become: true
+
+    - name: Assert TLS protocol list and transportSecurity feature
+      ansible.builtin.assert:
+        that:
+          - "'transportSecurity-1.0' in _ssl"
+          - "'TLSv1.3,TLSv1.2' in _ssl or 'sslProtocol=\"TLSv1.3,TLSv1.2\"' in _ssl"
+        fail_msg: "ssl_config.xml missing transportSecurity or TLSv1.3,TLSv1.2"
+        success_msg: "ssl_config.xml content looks correct"
+      vars:
+        _ssl: "{{ _ol_ssl_xml.content | b64decode }}"
+
+    - name: Confirm HTTPS port is accepting connections
+      ansible.builtin.wait_for:
+        host: "127.0.0.1"
+        port: 9443
+        timeout: 60
+        msg: "HTTPS port 9443 is not accepting connections"
+
+    - name: Probe Admin Center over HTTPS
+      ansible.builtin.uri:
+        url: "https://127.0.0.1:9443/adminCenter/"
+        method: GET
+        validate_certs: false
+        status_code: [200, 401, 302]
+        return_content: false
+      register: _ol_ac_probe
+      retries: 12
+      delay: 5
+      until: _ol_ac_probe.status in [200, 401, 302]
+
+    - name: Assert Admin Center responded
+      ansible.builtin.assert:
+        that: _ol_ac_probe.status in [200, 401, 302]
+        fail_msg: "Admin Center did not respond on HTTPS"
+        success_msg: "Admin Center reachable over HTTPS (status {{ _ol_ac_probe.status }})"

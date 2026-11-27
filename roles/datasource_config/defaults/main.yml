@@ -1,0 +1,66 @@
+---
+# JDBC data source configuration: driver libraries, authData, dataSource and
+# connectionManager elements rendered into configDropins/overrides.
+# https://openliberty.io/docs/latest/relational-database-connections-JDBC.html
+# https://openliberty.io/docs/latest/reference/config/dataSource.html
+# https://openliberty.io/docs/latest/reference/config/jdbcDriver.html
+# https://openliberty.io/docs/latest/reference/config/connectionManager.html
+
+openliberty_home: /opt/openliberty/wlp
+openliberty_server_name: defaultServer
+openliberty_user: liberty
+openliberty_group: liberty
+openliberty_service_name: "openliberty-{{ openliberty_server_name }}"
+
+# jdbc-4.3 requires Java 11+; use jdbc-4.2 for Java 8.
+openliberty_datasource_feature: jdbc-4.3
+# Install missing features with featureUtility (needed for kernel / lean runtimes).
+openliberty_datasource_install_features: true
+
+# Directory (under the server directory) that holds JDBC driver jars.
+openliberty_jdbc_driver_dir: lib/jdbc
+
+# JDBC drivers. Each item:
+#   id:        driver id referenced by data sources (required)
+#   jars:      list of jar file names placed in openliberty_jdbc_driver_dir (required)
+#   src:       controller directory containing the jars         } one of src or
+#   url:       base URL; each jar is fetched from <url>/<jar>   } url, unless the
+#   checksums: optional dict {jar_name: "sha256:<hex>"} for url } jars already exist
+#   data_source / connection_pool_data_source / xa_data_source:
+#              optional javax.sql.* implementation class overrides
+#   class:     alias for connection_pool_data_source (kept for compatibility)
+
+#
+# openliberty_jdbc_drivers:
+#   - id: postgresql
+#     jars: [postgresql-42.7.4.jar]
+#     url: https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.4
+#     checksums:
+#       postgresql-42.7.4.jar: "sha256:<hex>"
+openliberty_jdbc_drivers: []
+
+# Credentials, referenced from data sources via `auth`. Each item:
+#   id, user, password (password MUST be {aes}/{hash} encoded or ${variable}).
+openliberty_datasource_auth: []
+
+# Data sources. Each item:
+#   id:                required
+#   jndiName:          required, e.g. jdbc/appDB
+#   driver:            required, id from openliberty_jdbc_drivers (or a driver
+#                      defined elsewhere in server config)
+#   properties_element: element name, default "properties"; use a vendor element
+#                      such as properties.postgresql, properties.db2.jcc,
+#                      properties.oracle, properties.microsoft.sqlserver
+#   properties:        dict of attributes, e.g. {serverName, portNumber, databaseName}
+#                      or {URL: "jdbc:..."}
+#   auth:              id from openliberty_datasource_auth
+#   type:              optional javax.sql.DataSource | ConnectionPoolDataSource | XADataSource
+#   isolationLevel:    optional TRANSACTION_READ_COMMITTED etc.
+#   pool:              optional dict for <connectionManager>:
+#                      maxPoolSize, minPoolSize, connectionTimeout, maxIdleTime,
+#                      agedTimeout, reapTime, purgePolicy
+#   statementCacheSize: optional integer
+openliberty_datasources_config: []
+
+# Refuse plaintext passwords in generated XML.
+openliberty_datasource_require_encoded_passwords: true

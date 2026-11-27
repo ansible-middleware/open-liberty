@@ -1,0 +1,98 @@
+---
+# ssl_config – main task entry point
+# Writes configDropins/overrides/ssl_config.xml and copies keystore/truststore.
+# Reference: https://openliberty.io/docs/latest/reference/config/ssl.html
+
+- name: Validate SSL configuration inputs
+  ansible.builtin.assert:
+    that:
+      - openliberty_ssl_keystore_password | length > 0
+      - (_openliberty_ssl_protocol_tokens | length) > 0
+      - (_openliberty_ssl_protocol_tokens | difference(_openliberty_ssl_allowed_protocols) | length) == 0
+      - not (openliberty_ssl_client_authentication | bool
+             or openliberty_ssl_client_authentication_supported | bool)
+        or (openliberty_ssl_truststore_password | length > 0)
+    fail_msg: >-
+      openliberty_ssl_keystore_password is required; openliberty_ssl_protocol must be
+      TLSv1.2 and/or TLSv1.3 (comma-separated, e.g. TLSv1.3,TLSv1.2); mutual TLS
+      requires openliberty_ssl_truststore_password.
+    quiet: true
+
+- name: Validate keystore password is encoded
+  ansible.builtin.assert:
+    that: openliberty_ssl_keystore_password is match(_openliberty_encoded_password_regex)
+    fail_msg: >-
+      openliberty_ssl_keystore_password must be {aes}/{hash} encoded or a ${variable}
+      reference. Use securityUtility encode, or set
+      openliberty_ssl_require_encoded_passwords: false (not recommended).
+    quiet: true
+  when: openliberty_ssl_require_encoded_passwords | bool
+
+- name: Validate truststore password is encoded
+  ansible.builtin.assert:
+    that: openliberty_ssl_truststore_password is match(_openliberty_encoded_password_regex)
+    fail_msg: >-
+      openliberty_ssl_truststore_password must be {aes}/{hash} encoded or a ${variable}
+      reference.
+    quiet: true
+  when:
+    - openliberty_ssl_require_encoded_passwords | bool
+    - openliberty_ssl_truststore_password | length > 0
+
+- name: Ensure required SSL features are installed
+  ansible.builtin.command:
+    cmd: >-
+      {{ openliberty_home }}/bin/featureUtility installFeature
+      {{ openliberty_ssl_feature }}
+      --acceptLicense
+  become: true
+  become_user: "{{ openliberty_user }}"
+  register: _openliberty_ssl_feature_install
+  changed_when: "'CWWKF1700I' in _openliberty_ssl_feature_install.stdout"
+  when: openliberty_ssl_install_features | bool
+
+- name: Ensure configDropins/overrides and security directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ openliberty_user }}"
+    group: "{{ openliberty_group }}"
+    mode: "0750"
+  become: true
+  loop:
+    - "{{ _openliberty_overrides_dir }}"
+    - "{{ _openliberty_security_dir }}"
+
+- name: Copy keystore
+  ansible.builtin.copy:
+    src: "{{ openliberty_ssl_keystore_src }}"
+    dest: "{{ _openliberty_security_dir }}/{{ openliberty_ssl_keystore_filename }}"
+    owner: "{{ openliberty_user }}"
+    group: "{{ openliberty_group }}"
+    mode: "0640"
+  become: true
+  when: openliberty_ssl_keystore_src | length > 0
+  notify: Restart Open Liberty service
+
+- name: Copy truststore
+  ansible.builtin.copy:
+    src: "{{ openliberty_ssl_truststore_src }}"
+    dest: "{{ _openliberty_security_dir }}/{{ openliberty_ssl_truststore_filename }}"
+    owner: "{{ openliberty_user }}"
+    group: "{{ openliberty_group }}"
+    mode: "0640"
+  become: true
+  when: openliberty_ssl_truststore_src | length > 0
+  notify: Restart Open Liberty service
+
+- name: Deploy SSL configuration override
+  ansible.builtin.template:
+    src: ssl_config.xml.j2
+    dest: "{{ _openliberty_overrides_dir }}/ssl_config.xml"
+    owner: "{{ openliberty_user }}"
+    group: "{{ openliberty_group }}"
+    mode: "0640"
+    backup: true
+  become: true
+  no_log: true
+  notify: Restart Open Liberty service

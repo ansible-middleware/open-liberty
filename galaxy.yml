@@ -10,7 +10,8 @@ description: >
   Ansible collection to install, configure, and manage IBM Open Liberty
   application server. Supports Core Profile, Web Profile, and Platform (Full Platform)
   standalone installations. Includes roles for application deployment,
-  version updates, and HTTP/HTTPS port configuration.
+  version updates, HTTP/HTTPS port configuration, TLS, security, JDBC data
+  sources, and Admin Center configuration.
 license:
   - GPL-2.0-only
 tags:

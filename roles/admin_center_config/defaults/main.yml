@@ -1,0 +1,38 @@
+---
+# Admin Center: adminCenter feature, administrator/reader role mapping and
+# remote file access for the REST connector.
+# https://openliberty.io/docs/latest/admin-center.html
+# https://openliberty.io/docs/latest/reference/config/administrator-role.html
+# https://openliberty.io/docs/latest/reference/config/reader-role.html
+
+openliberty_home: /opt/openliberty/wlp
+openliberty_server_name: defaultServer
+openliberty_user: liberty
+openliberty_group: liberty
+openliberty_service_name: "openliberty-{{ openliberty_server_name }}"
+
+# Admin Center is served over HTTPS (https://<host>:<https_port>/adminCenter/).
+# Enable HTTPS with the port_config role and configure TLS with ssl_config.
+openliberty_https_enabled: false
+openliberty_https_port: 9443
+# Fail when HTTPS is not enabled. Disable only if HTTPS is configured elsewhere.
+openliberty_admin_center_require_https: true
+
+openliberty_admin_center_feature: adminCenter-1.0
+# Extra features, e.g. ["monitor-1.0"] to populate the monitoring views.
+openliberty_admin_center_extra_features: []
+# Install missing features with featureUtility (Admin Center is not in webProfile).
+openliberty_admin_center_install_features: true
+
+# Identities from the user registry (see security_config role) mapped to the
+# management roles. At least one administrator user or group is required.
+openliberty_admin_center_administrator_users: []
+openliberty_admin_center_administrator_groups: []
+openliberty_admin_center_reader_users: []
+openliberty_admin_center_reader_groups: []
+
+# Directories the REST connector may read/write (file transfer from Admin Center).
+# Empty list keeps Liberty's restrictive defaults.
+# Example: ["${server.output.dir}/logs"]
+openliberty_admin_center_read_dirs: []
+openliberty_admin_center_write_dirs: []

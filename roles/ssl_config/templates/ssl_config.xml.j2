@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Managed by Ansible (ssl_config role) – do not edit by hand -->
+<!-- Reference: https://openliberty.io/docs/latest/reference/config/ssl.html -->
+<server>
+
+    <featureManager>
+        <feature>{{ openliberty_ssl_feature }}</feature>
+    </featureManager>
+
+    <keyStore id="{{ openliberty_ssl_keystore_id }}"
+              location="${server.config.dir}/resources/security/{{ openliberty_ssl_keystore_filename }}"
+              type="{{ openliberty_ssl_keystore_type }}"
+              password="{{ openliberty_ssl_keystore_password | e }}"
+    />
+{% set _has_truststore = (openliberty_ssl_truststore_src | length > 0) or (openliberty_ssl_truststore_password | length > 0) %}
+{% if _has_truststore %}
+
+    <keyStore id="{{ openliberty_ssl_truststore_id }}"
+              location="${server.config.dir}/resources/security/{{ openliberty_ssl_truststore_filename }}"
+              type="{{ openliberty_ssl_truststore_type }}"
+              password="{{ openliberty_ssl_truststore_password | e }}"
+    />
+{% endif %}
+
+    <ssl id="{{ openliberty_ssl_config_id }}"
+         keyStoreRef="{{ openliberty_ssl_keystore_id }}"
+{% if _has_truststore %}
+         trustStoreRef="{{ openliberty_ssl_truststore_id }}"
+{% endif %}
+         sslProtocol="{{ openliberty_ssl_protocol }}"
+         verifyHostname="{{ openliberty_ssl_verify_hostname | bool | lower }}"
+         clientAuthentication="{{ openliberty_ssl_client_authentication | bool | lower }}"
+         clientAuthenticationSupported="{{ openliberty_ssl_client_authentication_supported | bool | lower }}"
+{% if openliberty_ssl_enabled_ciphers | length > 0 %}
+         enabledCiphers="{{ openliberty_ssl_enabled_ciphers | join(' ') }}"
+{% endif %}
+    />
+{% if openliberty_ssl_set_default | bool %}
+
+    <sslDefault sslRef="{{ openliberty_ssl_config_id }}" />
+{% endif %}
+
+</server>

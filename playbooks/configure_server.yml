@@ -1,0 +1,47 @@
+---
+# Harden and extend an existing Open Liberty server: TLS, security registry,
+# HTTPS listener, Admin Center and JDBC data sources.
+#   ansible-playbook -i inventory.ini playbooks/configure_server.yml -e @liberty_config_vars.yml
+#
+# Prerequisites: Open Liberty installed, server created, and systemd unit present
+# (see playbooks/install.yml). Roles install missing Liberty features via
+# featureUtility (Admin Center is not part of Web Profile).
+#
+# Secrets (keystore/registry/LDAP/data source passwords) must be {aes}-encoded
+# (<wlp>/bin/securityUtility encode --encoding=aes) and stored in Ansible Vault.
+# Every role writes its own file under configDropins/overrides, so server.xml
+# produced by server_config is left untouched. datasource_config is a no-op
+# until openliberty_jdbc_drivers / openliberty_datasources_config are set.
+- name: Configure Open Liberty TLS, security, Admin Center and data sources
+  hosts: liberty_servers
+  gather_facts: true
+  vars:
+    openliberty_server_name: defaultServer
+    openliberty_home: /opt/openliberty/wlp
+    openliberty_user: liberty
+    openliberty_group: liberty
+    openliberty_https_enabled: true
+    openliberty_https_port: 9443
+    # Minimum inputs, override with -e @vars.yml / vault:
+    # openliberty_ssl_keystore_src: files/key.p12
+    # openliberty_ssl_keystore_password: "{aes}..."
+    # openliberty_security_users:
+    #   - { name: admin, password: "{aes}..." }
+    # openliberty_admin_center_administrator_users: [admin]
+    # openliberty_jdbc_drivers / openliberty_datasource_auth / openliberty_datasources_config
+  roles:
+    - role: middleware_automation.open_liberty.ssl_config
+    - role: middleware_automation.open_liberty.security_config
+    - role: middleware_automation.open_liberty.port_config
+    - role: middleware_automation.open_liberty.admin_center_config
+    - role: middleware_automation.open_liberty.datasource_config
+  post_tasks:
+    - name: Apply pending configuration changes before probing
+      ansible.builtin.meta: flush_handlers
+
+    - name: Confirm HTTPS port is accepting connections
+      ansible.builtin.wait_for:
+        host: "127.0.0.1"
+        port: "{{ openliberty_https_port }}"
+        timeout: 120
+        msg: "Timed out waiting for HTTPS port {{ openliberty_https_port }}."

@@ -1,0 +1,14 @@
+---
+_openliberty_server_dir: "{{ openliberty_home }}/usr/servers/{{ openliberty_server_name }}"
+_openliberty_overrides_dir: "{{ _openliberty_server_dir }}/configDropins/overrides"
+_openliberty_security_dir: "{{ _openliberty_server_dir }}/resources/security"
+
+# Accepts {aes}..., {hash}... or ${variable} references only.
+_openliberty_encoded_password_regex: '^([{]aes[}]|[{]hash[}]|[$][{])'
+
+# Individual tokens allowed in openliberty_ssl_protocol (comma-separated).
+_openliberty_ssl_allowed_protocols:
+  - TLSv1.2
+  - TLSv1.3
+
+_openliberty_ssl_protocol_tokens: "{{ openliberty_ssl_protocol | string | split(',') | map('trim') | reject('equalto', '') | list }}"

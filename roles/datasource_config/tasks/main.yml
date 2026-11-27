@@ -1,0 +1,121 @@
+---
+# datasource_config – main task entry point
+# Reference: https://openliberty.io/docs/latest/relational-database-connections-JDBC.html
+
+- name: Validate data source inputs
+  ansible.builtin.assert:
+    that:
+      - openliberty_jdbc_drivers | selectattr('id', 'defined') | list | length == openliberty_jdbc_drivers | length
+      - openliberty_jdbc_drivers | selectattr('jars', 'defined') | list | length == openliberty_jdbc_drivers | length
+      - openliberty_jdbc_drivers | rejectattr('jars', 'equalto', []) | list | length == openliberty_jdbc_drivers | length
+      - openliberty_datasources_config | selectattr('id', 'defined') | list | length == openliberty_datasources_config | length
+      - openliberty_datasources_config | selectattr('jndiName', 'defined') | list | length == openliberty_datasources_config | length
+      - openliberty_datasources_config | selectattr('driver', 'defined') | list | length == openliberty_datasources_config | length
+      - >-
+        openliberty_datasources_config
+        | map(attribute='auth', default='')
+        | select
+        | difference(openliberty_datasource_auth | map(attribute='id') | list)
+        | length == 0
+    fail_msg: >-
+      Every driver needs id and a non-empty jars list; every data source needs id,
+      jndiName and driver; each data source auth must reference an id in
+      openliberty_datasource_auth.
+    quiet: true
+  when: _openliberty_datasource_configured | bool
+
+- name: Validate authData passwords are encoded
+  ansible.builtin.assert:
+    that:
+      - openliberty_datasource_auth
+        | selectattr('password', 'defined')
+        | list | length == openliberty_datasource_auth | length
+      - openliberty_datasource_auth
+        | rejectattr('password', 'match', _openliberty_encoded_password_regex)
+        | list | length == 0
+    fail_msg: >-
+      Data source passwords must be {aes}/{hash} encoded (securityUtility encode)
+      or ${variable} references. Set openliberty_datasource_require_encoded_passwords:
+      false to override (not recommended).
+    quiet: true
+  when:
+    - openliberty_datasource_require_encoded_passwords | bool
+    - openliberty_datasource_auth | length > 0
+
+- name: Ensure JDBC feature is installed
+  ansible.builtin.command:
+    cmd: >-
+      {{ openliberty_home }}/bin/featureUtility installFeature
+      {{ openliberty_datasource_feature }}
+      --acceptLicense
+  become: true
+  become_user: "{{ openliberty_user }}"
+  register: _openliberty_datasource_feature_install
+  changed_when: "'CWWKF1700I' in _openliberty_datasource_feature_install.stdout"
+  when:
+    - _openliberty_datasource_configured | bool
+    - openliberty_datasource_install_features | bool
+
+- name: Ensure configDropins/overrides and JDBC driver directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ openliberty_user }}"
+    group: "{{ openliberty_group }}"
+    mode: "0750"
+  become: true
+  loop:
+    - "{{ _openliberty_overrides_dir }}"
+    - "{{ _openliberty_jdbc_dir }}"
+  when: _openliberty_datasource_configured | bool
+
+- name: Copy JDBC driver jars from the controller
+  ansible.builtin.copy:
+    src: "{{ item.0.src | trim | regex_replace('/$', '') }}/{{ item.1 }}"
+    dest: "{{ _openliberty_jdbc_dir }}/{{ item.1 }}"
+    owner: "{{ openliberty_user }}"
+    group: "{{ openliberty_group }}"
+    mode: "0640"
+  become: true
+  loop: "{{ openliberty_jdbc_drivers | selectattr('src', 'defined') | subelements('jars') }}"
+  loop_control:
+    label: "{{ item.0.id }}: {{ item.1 }}"
+  when: _openliberty_datasource_configured | bool
+  notify: Restart Open Liberty service
+
+- name: Download JDBC driver jars
+  ansible.builtin.get_url:
+    url: "{{ item.0.url | trim | regex_replace('/$', '') }}/{{ item.1 }}"
+    dest: "{{ _openliberty_jdbc_dir }}/{{ item.1 }}"
+    checksum: "{{ (item.0.checksums | default({}))[item.1] | default(omit) }}"
+    owner: "{{ openliberty_user }}"
+    group: "{{ openliberty_group }}"
+    mode: "0640"
+    timeout: 60
+  become: true
+  loop: "{{ openliberty_jdbc_drivers | selectattr('src', 'undefined') | selectattr('url', 'defined') | subelements('jars') }}"
+  loop_control:
+    label: "{{ item.0.id }}: {{ item.1 }}"
+  when: _openliberty_datasource_configured | bool
+  notify: Restart Open Liberty service
+
+- name: Deploy data source configuration override
+  ansible.builtin.template:
+    src: datasource_config.xml.j2
+    dest: "{{ _openliberty_overrides_dir }}/datasource_config.xml"
+    owner: "{{ openliberty_user }}"
+    group: "{{ openliberty_group }}"
+    mode: "0640"
+    backup: true
+  become: true
+  no_log: true
+  when: _openliberty_datasource_configured | bool
+  notify: Restart Open Liberty service
+
+- name: Remove empty data source configuration override
+  ansible.builtin.file:
+    path: "{{ _openliberty_overrides_dir }}/datasource_config.xml"
+    state: absent
+  become: true
+  when: not (_openliberty_datasource_configured | bool)
+  notify: Restart Open Liberty service

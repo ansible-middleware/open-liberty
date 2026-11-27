@@ -1,0 +1,102 @@
+---
+# converge.yml – configure scenario
+# Install Open Liberty, generate a PKCS12 keystore on the instance, then apply
+# ssl_config → security_config → port_config → admin_center_config → datasource_config.
+- name: Converge – Server configuration (TLS, security, Admin Center)
+  hosts: all
+  gather_facts: true
+
+  vars:
+    _ol_server_dir: "{{ openliberty_home | default('/opt/openliberty/wlp') }}/usr/servers/{{ openliberty_server_name | default('defaultServer') }}"
+    _ol_security_dir: "{{ _ol_server_dir }}/resources/security"
+
+  tasks:
+    - name: Install Open Liberty
+      ansible.builtin.include_role:
+        name: middleware_automation.open_liberty.install
+
+    - name: Configure base server (HTTP only initially)
+      ansible.builtin.include_role:
+        name: middleware_automation.open_liberty.server_config
+      vars:
+        openliberty_https_enabled: false
+
+    - name: Enable and start Open Liberty service
+      ansible.builtin.include_role:
+        name: middleware_automation.open_liberty.systemd
+
+    - name: Wait for Open Liberty to come up on HTTP
+      ansible.builtin.wait_for:
+        host: "127.0.0.1"
+        port: "{{ openliberty_http_port }}"
+        timeout: 120
+        delay: 5
+
+    - name: Ensure resources/security directory exists
+      ansible.builtin.file:
+        path: "{{ _ol_security_dir }}"
+        state: directory
+        owner: "{{ openliberty_user | default('liberty') }}"
+        group: "{{ openliberty_group | default('liberty') }}"
+        mode: "0750"
+      become: true
+
+    - name: Generate PKCS12 keystore for TLS tests
+      ansible.builtin.command:
+        cmd: >-
+          keytool -genkeypair -alias default -keyalg RSA -keysize 2048
+          -storetype PKCS12
+          -keystore {{ _ol_security_dir }}/key.p12
+          -storepass changeit -keypass changeit
+          -dname CN=localhost -validity 365
+          -noprompt
+        creates: "{{ _ol_security_dir }}/key.p12"
+      become: true
+      become_user: "{{ openliberty_user | default('liberty') }}"
+
+    - name: Configure TLS
+      ansible.builtin.include_role:
+        name: middleware_automation.open_liberty.ssl_config
+
+    - name: Configure security registry
+      ansible.builtin.include_role:
+        name: middleware_automation.open_liberty.security_config
+
+    - name: Enable HTTPS listener
+      ansible.builtin.include_role:
+        name: middleware_automation.open_liberty.port_config
+      vars:
+        openliberty_firewall_port_manage: false
+
+    - name: Enable Admin Center
+      ansible.builtin.include_role:
+        name: middleware_automation.open_liberty.admin_center_config
+
+    - name: Run datasource_config with empty inputs (no-op)
+      ansible.builtin.include_role:
+        name: middleware_automation.open_liberty.datasource_config
+
+    - name: Apply pending configuration changes
+      ansible.builtin.meta: flush_handlers
+
+    - name: Restart Open Liberty to apply configuration overrides
+      ansible.builtin.systemd:
+        name: "openliberty-{{ openliberty_server_name | default('defaultServer') }}"
+        state: restarted
+      become: true
+
+    - name: Wait until systemd reports the service active after restart
+      ansible.builtin.systemd:
+        name: "openliberty-{{ openliberty_server_name | default('defaultServer') }}"
+      register: _ol_svc
+      become: true
+      retries: 30
+      delay: 2
+      until: (_ol_svc.status.ActiveState | default('')) == 'active'
+
+    - name: Wait for HTTPS port
+      ansible.builtin.wait_for:
+        host: "127.0.0.1"
+        port: "{{ openliberty_https_port }}"
+        timeout: 180
+        delay: 5

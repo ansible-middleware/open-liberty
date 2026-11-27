@@ -1,0 +1,48 @@
+---
+# admin_center_config – main task entry point
+# Writes configDropins/overrides/admin_center_config.xml.
+# Reference: https://openliberty.io/docs/latest/admin-center.html
+
+- name: Validate Admin Center inputs
+  ansible.builtin.assert:
+    that:
+      - openliberty_admin_center_administrator_users | length > 0
+        or openliberty_admin_center_administrator_groups | length > 0
+      - not (openliberty_admin_center_require_https | bool)
+        or (openliberty_https_enabled | bool)
+    fail_msg: >-
+      Admin Center needs at least one administrator user or group, and HTTPS
+      enabled (openliberty_https_enabled: true, see port_config and ssl_config roles).
+    quiet: true
+
+- name: Ensure Admin Center features are installed
+  ansible.builtin.command:
+    cmd: >-
+      {{ openliberty_home }}/bin/featureUtility installFeature
+      {{ ([openliberty_admin_center_feature] + openliberty_admin_center_extra_features) | join(' ') }}
+      --acceptLicense
+  become: true
+  become_user: "{{ openliberty_user }}"
+  register: _openliberty_admin_center_feature_install
+  changed_when: "'CWWKF1700I' in _openliberty_admin_center_feature_install.stdout"
+  when: openliberty_admin_center_install_features | bool
+
+- name: Ensure configDropins/overrides directory exists
+  ansible.builtin.file:
+    path: "{{ _openliberty_overrides_dir }}"
+    state: directory
+    owner: "{{ openliberty_user }}"
+    group: "{{ openliberty_group }}"
+    mode: "0750"
+  become: true
+
+- name: Deploy Admin Center configuration override
+  ansible.builtin.template:
+    src: admin_center_config.xml.j2
+    dest: "{{ _openliberty_overrides_dir }}/admin_center_config.xml"
+    owner: "{{ openliberty_user }}"
+    group: "{{ openliberty_group }}"
+    mode: "0640"
+    backup: true
+  become: true
+  notify: Restart Open Liberty service

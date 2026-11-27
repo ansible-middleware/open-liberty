@@ -1,0 +1,24 @@
+---
+galaxy_info:
+  author: Ansible Middleware Team
+  description: >
+    Configure Open Liberty security: basic or LDAP user registry, management
+    roles, web application security, LTPA and session cookie hardening.
+  license: GPL-2.0-only
+  min_ansible_version: "2.16"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+        - "10"
+  galaxy_tags:
+    - openliberty
+    - liberty
+    - java
+    - jakarta
+    - middleware
+    - security
+    - ldap
+    - ibm
+dependencies: []
